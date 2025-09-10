@@ -46,15 +46,22 @@ class RolePermissionSeeder extends Seeder
             'settings_manage',
         ];
 
+        // Create permissions if they don't exist
         foreach ($permissions as $permission) {
-            Permission::create(['name' => $permission]);
+            Permission::firstOrCreate(['name' => $permission]);
         }
 
         // Create roles and assign permissions
-        $superAdmin = Role::create(['name' => 'Super Admin']);
-        $superAdmin->givePermissionTo(Permission::all());
+        // Create Company Admin role with all permissions
+        $companyAdmin = Role::firstOrCreate(['name' => 'CompanyAdmin']);
+        $companyAdmin->syncPermissions(Permission::all());
 
-        $admin = Role::create(['name' => 'Admin']);
+        // Create Super Admin role with all permissions
+        $superAdmin = Role::firstOrCreate(['name' => 'Super Admin']);
+        $superAdmin->syncPermissions(Permission::all());
+
+        // Create Admin role with specific permissions
+        $admin = Role::firstOrCreate(['name' => 'Admin']);
         $adminPermissions = [
             'user_management_access',
             'user_create',
@@ -71,9 +78,10 @@ class RolePermissionSeeder extends Seeder
             'appointment_edit',
             'report_view',
         ];
-        $admin->givePermissionTo($adminPermissions);
+        $admin->syncPermissions($adminPermissions);
 
-        $staff = Role::create(['name' => 'Staff']);
+        // Create Staff role with specific permissions
+        $staff = Role::firstOrCreate(['name' => 'Staff']);
         $staffPermissions = [
             'service_management_access',
             'customer_management_access',
@@ -83,15 +91,16 @@ class RolePermissionSeeder extends Seeder
             'appointment_create',
             'appointment_edit',
         ];
-        $staff->givePermissionTo($staffPermissions);
+        $staff->syncPermissions($staffPermissions);
 
-        $technician = Role::create(['name' => 'Technician']);
+        // Create Technician role with specific permissions
+        $technician = Role::firstOrCreate(['name' => 'Technician']);
         $technicianPermissions = [
             'service_management_access',
             'appointment_management_access',
             'appointment_edit',
         ];
-        $technician->givePermissionTo($technicianPermissions);
+        $technician->syncPermissions($technicianPermissions);
 
         $customer = Role::create(['name' => 'Customer']);
         $customerPermissions = [

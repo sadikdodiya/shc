@@ -15,6 +15,17 @@ class AdminMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
+        if (!auth()->check()) {
+            return redirect()->route('login');
+        }
+
+        $user = auth()->user();
+        
+        // Check if user has Super Admin role or has admin dashboard permission
+        if (!$user->hasRole('Super Admin') && !$user->can('view admin dashboard')) {
+            abort(403, 'User does not have the right roles.');
+        }
+
         return $next($request);
     }
 }

@@ -49,6 +49,7 @@
                                 {{ __('Log Out') }}
                             </x-dropdown-link>
                         </form>
+                        <!-- End Authentication -->
                     </x-slot>
                 </x-dropdown>
             </div>

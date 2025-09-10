@@ -144,7 +144,15 @@ class User extends Authenticatable implements MustVerifyEmail
             return $this->roles->contains('name', $role);
         }
 
-        return (bool) $role->intersect($this->roles)->count();
+        if (is_array($role)) {
+            return $this->roles->whereIn('name', $role)->isNotEmpty();
+        }
+
+        if ($role instanceof \Illuminate\Support\Collection) {
+            return $role->intersect($this->roles)->isNotEmpty();
+        }
+
+        return false;
     }
 
     /**

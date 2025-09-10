@@ -19,7 +19,12 @@ return new class extends Migration
             $table->dropForeign(['user_id']);
         });
 
-        // Recreate the foreign key constraints with proper onDelete behavior
+        // First, modify the user_id column to be nullable
+        Schema::table('part_entries', function (Blueprint $table) {
+            $table->unsignedBigInteger('user_id')->nullable()->change();
+        });
+
+        // Then recreate the foreign key constraints with proper onDelete behavior
         Schema::table('part_entries', function (Blueprint $table) {
             // Add foreign key to items table
             $table->foreign('item_id')

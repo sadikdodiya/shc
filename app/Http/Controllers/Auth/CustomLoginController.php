@@ -4,33 +4,22 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class CustomLoginController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Login Controller
-    |--------------------------------------------------------------------------
-    |
-    | This controller handles authenticating users for the application and
-    | redirecting them to your home screen. The controller uses a trait
-    | to conveniently provide its functionality to your applications.
-    |
-    */
-
     use AuthenticatesUsers;
 
     /**
      * Where to redirect users after login.
-     *
-     * @var string
      */
-    protected $redirectTo = RouteServiceProvider::HOME;
+    protected $redirectTo = '/dashboard';
+
 
     /**
      * Create a new controller instance.
@@ -60,99 +49,151 @@ class CustomLoginController extends Controller
      *
      * @throws \Illuminate\Validation\ValidationException
      */
-    /**
-     * Handle a login request to the application.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Http\Response|\Illuminate\Http\JsonResponse
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
     public function login(Request $request)
     {
-        $this->validateLogin($request);
-
-        // If the class is using the ThrottlesLogins trait, we can automatically throttle
-        // the login attempts for this application. We'll key this by the username and
-        // the IP address of the client making these requests into this application.
-        if (method_exists($this, 'hasTooManyLoginAttempts') &&
-            $this->hasTooManyLoginAttempts($request)) {
-            $this->fireLockoutEvent($request);
-
-            return $this->sendLockoutResponse($request);
-        }
-
-        $credentials = $this->credentials($request);
-        $loginField = $this->getLoginField($request->input('email'));
+        Log::info('Login attempt started', [
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'input' => $request->except(['_token', 'password'])
+        ]);
         
-        // Add the login field to the credentials
-        $credentials[$loginField] = $request->input('email');
-        unset($credentials['email']);
-        
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
-            // Check if user is active
-            if (!Auth::user()->isActive()) {
-                Auth::logout();
-                return $this->sendFailedLoginResponse($request, 'auth.inactive');
+        try {
+            // Validate login input
+            $this->validateLogin($request);
+            Log::debug('Login validation passed', [
+                'email' => $request->input('email'),
+                'has_password' => !empty($request->input('password'))
+            ]);
+            
+            // Log the login field being used
+            $loginField = $this->getLoginField($request->input('email'));
+            Log::debug('Using login field', [
+                'field' => $loginField,
+                'value' => $request->input('email')
+            ]);
+
+            // Check for too many login attempts
+            if (method_exists($this, 'hasTooManyLoginAttempts') &&
+                $this->hasTooManyLoginAttempts($request)) {
+                Log::warning('Too many login attempts', [
+                    'ip' => $request->ip(),
+                    'email' => $request->input('email')
+                ]);
+                $this->fireLockoutEvent($request);
+                return $this->sendLockoutResponse($request);
             }
 
-            // Check if email is verified if required
-            if (config('auth.verify_email') && !Auth::user()->hasVerifiedEmail()) {
-                Auth::logout();
-                return $this->sendFailedLoginResponse($request, 'auth.unverified');
+            // Prepare credentials for authentication
+            $credentials = $this->credentials($request);
+            
+            // Determine login field (email or username)
+            $loginField = $this->getLoginField($request->input('email'));
+            $loginValue = $request->input('email');
+            
+            // Clean phone number if that's what's being used
+            if ($loginField === 'phone') {
+                $loginValue = preg_replace('/[^0-9]/', '', $loginValue);
+            }
+            
+            $credentials[$loginField] = $loginValue;
+            unset($credentials['email']);
+
+            Log::debug('Attempting authentication', [
+                'login_field' => $loginField,
+                'login_value' => $loginValue,
+                'has_remember' => $request->filled('remember'),
+                'credentials_keys' => array_keys($credentials)
+            ]);
+
+            // Attempt authentication
+            $authResult = $this->guard()->attempt($credentials, $request->filled('remember'));
+            
+            if ($authResult) {
+                $user = $this->guard()->user();
+                Log::info('Login successful', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'name' => $user->name,
+                    'roles' => $user->getRoleNames()->toArray(),
+                    'login_field' => $loginField,
+                    'session_id' => session()->getId()
+                ]);
+                return $this->sendLoginResponse($request);
+            } else {
+                // Log failed authentication
+                $user = User::where($loginField, $credentials[$loginField])->first();
+                Log::warning('Authentication failed', [
+                    'login_field' => $loginField,
+                    'login_value' => $credentials[$loginField],
+                    'user_exists' => !is_null($user),
+                    'ip' => $request->ip()
+                ]);
             }
 
-            return $this->sendLoginResponse($request);
+            // Log failed login attempt
+            Log::warning('Login failed', [
+                'login_field' => $loginField,
+                'email' => $request->input('email'),
+                'ip' => $request->ip()
+            ]);
+
+            $this->incrementLoginAttempts($request);
+            
+            return $this->sendFailedLoginResponse($request);
+            
+        } catch (\Exception $e) {
+            Log::error('Login error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        // If the login attempt was unsuccessful we will increment the number of attempts
-        // to login and redirect the user back to the login form. Of course, when this
-        // user surpasses their maximum number of attempts they will get locked out.
-        $this->incrementLoginAttempts($request);
-
-        return $this->sendFailedLoginResponse($request);
     }
-    
+
     /**
-     * Determine the login field (email or phone) based on the input.
+     * Get the login username/email to be used by the controller.
+     *
+     * @return string
+     */
+    public function username()
+    {
+        return 'email';
+    }
+
+    /**
+     * Get the login field (email or username) based on the input.
+     *
+     * @param  string  $input
+     * @return string
+     */
+    /**
+     * Get the login field (email, phone, or username) based on the input.
      *
      * @param  string  $input
      * @return string
      */
     protected function getLoginField($input)
     {
-        return filter_var($input, FILTER_VALIDATE_EMAIL) ? 'email' : 'phone';
+        if (filter_var($input, FILTER_VALIDATE_EMAIL)) {
+            return 'email';
+        }
+        
+        // Check if input is a phone number (digits only, at least 10 digits)
+        $digits = preg_replace('/[^0-9]/', '', $input);
+        if (strlen($digits) >= 10) {
+            return 'phone';
+        }
+        
+        // Default to username
+        return 'username';
     }
 
     /**
      * Validate the user login request.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @return void
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
-    /**
-     * Validate the user login request.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return void
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
-    protected function validateLogin(Request $request)
-    {
-        $rules = [
-            'password' => 'required|string',
-        ];
-
-        // Check if the input is an email or phone
-        $input = $request->input('email');
-        $field = filter_var($input, FILTER_VALIDATE_EMAIL) ? 'email' : 'phone';
-        
-        // Add validation rule based on the field type
-        if ($field === 'email') {
-            $rules['email'] = 'required|string|email|max:255';
         } else {
             $rules['email'] = 'required|string|regex:/^[0-9+\-\s()]+$/|min:10';
         }
@@ -164,15 +205,19 @@ class CustomLoginController extends Controller
      * Get the failed login response instance.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  string  $message
      * @return \Symfony\Component\HttpFoundation\Response
      *
      * @throws \Illuminate\Validation\ValidationException
      */
-    protected function sendFailedLoginResponse(Request $request, $message = 'auth.failed')
+    protected function sendFailedLoginResponse(Request $request)
     {
+        Log::warning('Sending failed login response', [
+            'email' => $request->input('email'),
+            'ip' => $request->ip()
+        ]);
+        
         throw ValidationException::withMessages([
-            'email' => [trans($message)],
+            $this->username() => [trans('auth.failed')],
         ]);
     }
 

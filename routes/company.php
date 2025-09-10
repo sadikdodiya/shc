@@ -6,6 +6,16 @@ use App\Http\Controllers\Company\BrandController;
 use App\Http\Controllers\Company\ProductController;
 use App\Http\Controllers\Company\PartEntryController;
 
+// Test route to verify routing is working
+Route::get('/test-company-route', function () {
+    return 'Company test route is working! This is from company.php';
+});
+
+// Test route without any middleware
+Route::get('/test-company-route', function () {
+    return 'Company test route is working!';
+});
+
 /*
 |--------------------------------------------------------------------------
 | Company Routes
@@ -18,8 +28,8 @@ use App\Http\Controllers\Company\PartEntryController;
 */
 
 Route::middleware(['auth', 'verified', 'role:CompanyAdmin'])->group(function () {
-    // Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    // Company Dashboard
+    Route::get('/', [DashboardController::class, 'index'])->name('company.dashboard');
     
     // Brands Resource
     Route::resource('brands', BrandController::class)->except(['show']);

@@ -26,7 +26,8 @@ class CompanyController extends Controller
      */
     public function create()
     {
-        return view('superadmin.companies.create');
+        $countries = require app_path('Helpers/countries.php');
+        return view('superadmin.companies.create', compact('countries'));
     }
 
     /**
@@ -66,9 +67,10 @@ class CompanyController extends Controller
             'status' => true,
         ]);
 
-        // Create the admin user
-        $user = User::create([
+        // Create admin user for the company
+        $admin = User::create([
             'name' => $validated['admin_name'],
+            'username' => strtolower(str_replace(' ', '', $validated['admin_name'])) . rand(100, 999), // Generate a unique username
             'email' => $validated['admin_email'],
             'phone' => $validated['admin_phone'],
             'password' => Hash::make($validated['password']),
@@ -77,7 +79,7 @@ class CompanyController extends Controller
         ]);
 
         // Assign the CompanyAdmin role
-        $user->assignRole('CompanyAdmin');
+        $admin->assignRole('CompanyAdmin');
 
         return redirect()->route('admin.companies.index')
             ->with('success', 'Company created successfully.');

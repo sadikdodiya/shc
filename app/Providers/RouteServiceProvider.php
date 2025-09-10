@@ -38,6 +38,11 @@ class RouteServiceProvider extends ServiceProvider
         $this->configureRateLimiting();
 
         $this->routes(function () {
+            // Auth Routes - Load first to ensure they take precedence
+            Route::middleware('web')
+                ->namespace($this->namespace)
+                ->group(base_path('routes/auth.php'));
+
             // Web Routes
             Route::middleware('web')
                 ->namespace($this->namespace)
@@ -55,16 +60,16 @@ class RouteServiceProvider extends ServiceProvider
                 ->namespace($this->namespace . '\\Staff')
                 ->group(base_path('routes/staff.php'));
 
-            // Auth Routes
-            Route::middleware('web')
-                ->namespace($this->namespace)
-                ->group(base_path('routes/auth.php'));
-
-            // Company Admin Routes
-            Route::middleware(['web', 'auth', 'verified', 'role:CompanyAdmin'])
-                ->prefix('company')
-                ->name('company.')
+            // Test Routes
+            Route::get('/test-route', function () {
+                return 'Test route is working!';
+            });
+            
+            // Company Routes with required middleware
+            Route::prefix('company')
+                ->middleware(['auth', 'verified', 'role:CompanyAdmin'])
                 ->namespace($this->namespace . '\\Company')
+                ->name('company.')
                 ->group(base_path('routes/company.php'));
         });
     }

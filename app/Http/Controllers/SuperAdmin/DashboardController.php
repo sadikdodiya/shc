@@ -12,6 +12,23 @@ use Illuminate\View\View;
 class DashboardController extends Controller
 {
     /**
+     * Create a new controller instance.
+     */
+    public function __construct()
+    {
+        $this->middleware('auth');
+        $this->middleware('verified');
+        
+        // Check if user has admin role
+        $this->middleware(function ($request, $next) {
+            if (!auth()->user() || !auth()->user()->hasRole('Super Admin')) {
+                abort(403, 'Unauthorized action.');
+            }
+            return $next($request);
+        });
+    }
+
+    /**
      * Display the admin dashboard.
      */
     public function index(): View

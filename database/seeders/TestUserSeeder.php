@@ -9,27 +9,50 @@ use Spatie\Permission\Models\Role;
 
 class TestUserSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
-    public function run(): void
+    public function run()
     {
-        // Create a test user
-        $user = User::create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'phone' => '+1234567890',
-            'password' => Hash::make('password'),
-            'status' => 'active',
-            'email_verified_at' => null, // Ensure email is not verified
-        ]);
+        // Create Super Admin role if it doesn't exist
+        $superAdminRole = Role::firstOrCreate(['name' => 'Super Admin']);
+        
+        // Create test admin user
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name' => 'Admin User',
+                'username' => 'admin',
+                'phone' => '1234567890',
+                'password' => Hash::make('password123'),
+                'status' => 1, // 1 = active, 0 = inactive
+                'email_verified_at' => now(),
+            ]
+        );
 
-        // Assign a role to the user (e.g., 'user' role)
-        $role = Role::firstOrCreate(['name' => 'user']);
-        $user->assignRole($role);
+        // Assign Super Admin role
+        if (!$admin->hasRole('Super Admin')) {
+            $admin->assignRole($superAdminRole);
+        }
 
-        $this->command->info('Test user created:');
-        $this->command->info('Email: test@example.com');
-        $this->command->info('Password: password');
+        // Create test regular user
+        $user = User::firstOrCreate(
+            ['email' => 'user@example.com'],
+            [
+                'name' => 'Test User',
+                'username' => 'testuser',
+                'phone' => '0987654321',
+                'password' => Hash::make('password123'),
+                'status' => 1, // 1 = active, 0 = inactive
+                'email_verified_at' => now(),
+            ]
+        );
+
+        // Assign user role if it exists
+        $userRole = Role::firstOrCreate(['name' => 'user']);
+        if (!$user->hasRole('user')) {
+            $user->assignRole($userRole);
+        }
+
+        $this->command->info('Test users created successfully!');
+        $this->command->info('Admin: admin@example.com / password123');
+        $this->command->info('User: user@example.com / password123');
     }
 }

@@ -103,6 +103,7 @@
                 toggleIcon.classList.remove('fa-eye-slash');
                 toggleIcon.classList.add('fa-eye');
             }
+            return false; // Prevent form submission
         }
 
         // Update input type indicator based on input
@@ -115,22 +116,10 @@
                 // Email input
                 indicator.innerHTML = '<i class="fas fa-envelope"></i>';
                 hint.textContent = 'Enter your email address';
-                e.target.setAttribute('type', 'email');
-            } else if (/[0-9+\-()\s]/.test(input)) {
+            } else if (/^[0-9+\-\s()]*$/.test(input)) {
                 // Phone input
                 indicator.innerHTML = '<i class="fas fa-phone"></i>';
-                hint.textContent = 'Enter your phone number';
-                e.target.setAttribute('type', 'tel');
-                
-                // Format phone number as user types
-                const cleaned = input.replace(/\D/g, '');
-                if (cleaned.length > 10) {
-                    e.target.value = `+${cleaned.substring(0, 2)} ${cleaned.substring(2, 5)} ${cleaned.substring(5, 10)}${cleaned.length > 10 ? '-' + cleaned.substring(10, 14) : ''}`;
-                } else if (cleaned.length > 5) {
-                    e.target.value = `${cleaned.substring(0, 3)}-${cleaned.substring(3, 6)}-${cleaned.substring(6, 10)}`;
-                } else if (cleaned.length > 3) {
-                    e.target.value = `${cleaned.substring(0, 3)}-${cleaned.substring(3)}`;
-                } else if (cleaned.length > 0) {
+                hint.textContent = 'Enter your phone number with country code';
                     e.target.value = cleaned;
                 }
             } else {
@@ -141,11 +130,18 @@
             }
         });
 
-        // Prevent form submission on Enter key in the email field
+        // Handle Enter key to move to password field or submit form
         document.getElementById('email').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 document.getElementById('password').focus();
+            }
+        });
+        
+        // Allow form submission with Enter key in password field
+        document.getElementById('password').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('loginForm').requestSubmit();
             }
         });
     </script>

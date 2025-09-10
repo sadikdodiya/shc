@@ -1,42 +1,40 @@
 <?php
 
-use App\Http\Controllers\Auth\CustomLoginController;
-use App\Http\Controllers\Auth\CustomPasswordResetLinkController;
-use App\Http\Controllers\Auth\CustomNewPasswordController;
-use App\Http\Controllers\Auth\VerifyEmailController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use App\Http\Controllers\Auth\SimpleAuthController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\NewPasswordController;
+use App\Http\Controllers\Auth\PasswordResetLinkController;
 
 // Authentication Routes...
 Route::middleware('guest')->group(function () {
-    // Login Routes
-    Route::get('login', [CustomLoginController::class, 'showLoginForm'])->name('login');
-    Route::post('login', [CustomLoginController::class, 'login']);
+    // Simple Login Routes
+    Route::get('login', [SimpleAuthController::class, 'showLoginForm'])->name('login');
+    Route::post('login', [SimpleAuthController::class, 'login']);
 
     // Password Reset Routes
-    Route::get('forgot-password', function () {
-        return view('auth.forgot-password');
-    })->name('password.request');
+    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
+        ->name('password.request');
 
-    Route::post('forgot-password', [CustomPasswordResetLinkController::class, 'store'])
+    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
         ->name('password.email');
 
-    Route::get('reset-password/{token}', function ($token) {
-        return view('auth.passwords.reset', ['request' => request()]);
-    })->name('password.reset');
+    Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
+        ->name('password.reset');
 
-    Route::post('reset-password', [CustomNewPasswordController::class, 'store'])
+    Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.update');
 });
 
-// Logout Route
-Route::post('logout', [CustomLoginController::class, 'logout'])
-    ->middleware('auth')
-    ->name('logout');
 
 // Email Verification Routes...
+use App\Http\Controllers\Auth\VerifyEmailController;
+use Illuminate\Http\Request;
+
 Route::middleware(['auth', 'throttle:6,1'])->group(function () {
+    Route::get('/verify-email/{id}/{hash}', [VerifyEmailController::class, '__invoke'])
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('verification.verify');
+
     Route::get('verify-email', function () {
         return request()->user()->hasVerifiedEmail()
             ? redirect()->intended(route('dashboard'))

@@ -19,7 +19,9 @@ class PackageController extends Controller
             ->latest()
             ->paginate(10);
             
-        return view('superadmin.packages.index', compact('packages'));
+        $companies = Company::pluck('name', 'id');
+            
+        return view('superadmin.packages.index', compact('packages', 'companies'));
     }
 
     /**
@@ -27,8 +29,16 @@ class PackageController extends Controller
      */
     public function create()
     {
-        $companies = Company::where('status', true)->get();
-        return view('superadmin.packages.create', compact('companies'));
+        $companies = Company::where('status', true)->pluck('name', 'id');
+        $features = [
+            'feature1' => 'Feature 1',
+            'feature2' => 'Feature 2',
+            'feature3' => 'Feature 3',
+            'feature4' => 'Feature 4',
+            'feature5' => 'Feature 5',
+            'feature6' => 'Feature 6',
+        ];
+        return view('superadmin.packages.create', compact('companies', 'features'));
     }
 
     /**
@@ -50,7 +60,8 @@ class PackageController extends Controller
 
         // Calculate end date based on start date and duration
         $startDate = Carbon::parse($validated['start_date']);
-        $endDate = (clone $startDate)->addMonths($validated['duration_months']);
+        $durationMonths = (int)$validated['duration_months']; // Ensure it's an integer
+        $endDate = (clone $startDate)->addMonths($durationMonths);
 
         // Check if company already has an active package
         $existingActivePackage = Package::where('company_id', $validated['company_id'])
